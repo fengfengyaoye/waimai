@@ -4,6 +4,7 @@ import com.sky.entity.Orders;
 import com.sky.mapper.OrderMapper;
 import com.sky.mapper.UserMapper;
 import com.sky.service.ReportService;
+import com.sky.vo.OrderReportVO;
 import com.sky.vo.TurnoverReportVO;
 import com.sky.vo.UserReportVO;
 import lombok.extern.slf4j.Slf4j;
@@ -54,8 +55,8 @@ public class ReportServiceImpl implements ReportService {
             LocalDateTime beginTime = LocalDateTime.of(date, LocalTime.MIN);//2024-05-25 00:00:00
             LocalDateTime endTime = LocalDateTime.of(date, LocalTime.MAX);//2024-05-25 23:59:59
 
-            //# select sum(amount) from orders where order_time > begin and order_time < end and status = 5;
-            //select sum(amount) from orders where order_time like '2024-05-25%';
+            // select sum(amount) from orders where order_time > begin and order_time < end and status = 5;
+
             Map map = new HashMap();
             map.put("begin",beginTime);
             map.put("end",endTime);
@@ -109,7 +110,6 @@ public class ReportServiceImpl implements ReportService {
             LocalDateTime endTime = LocalDateTime.of(date, LocalTime.MAX);//2024-05-25 23:59:59
 
             Map map = new HashMap();
-
             map.put("end",endTime);
             Integer totalUser = userMapper.countByMap(map);
 
@@ -126,5 +126,81 @@ public class ReportServiceImpl implements ReportService {
                 .totalUserList(StringUtils.join(totalUserList, ","))
                 .newUserList(StringUtils.join(newUserList, ","))
                 .build();
+    }
+
+    /**
+     * 订单统计
+     * @param begin
+     * @param end
+     * @return
+     */
+    public OrderReportVO getOrderStatistics(LocalDate begin, LocalDate end) {
+
+
+        List<LocalDate> dateList = getDateList(begin, end);
+
+        //每日订单列表
+        List<Integer> orderCountList = new ArrayList<>();
+        //每日有效订单类别
+        List<Integer> validOrderCountList = new ArrayList<>();
+        //订单总数
+        Integer totalOrderCount = 0;
+        //有效订单数
+        Integer validOrderCount = 0;
+
+        for (LocalDate date : dateList) {
+            //查询data日期对应的营业额数据 营业额:状态为"已完成"的订单金额合计
+
+            LocalDateTime beginTime = LocalDateTime.of(date, LocalTime.MIN);//2024-05-25 00:00:00
+            LocalDateTime endTime = LocalDateTime.of(date, LocalTime.MAX);//2024-05-25 23:59:59
+
+            Map map = new HashMap();
+            map.put("begin",beginTime);
+            map.put("end",endTime);
+            Integer order = orderMapper.countByMap(map);
+            map.put("status",Orders.COMPLETED);
+            Integer validOrder = orderMapper.countByMap(map);
+
+            orderCountList.add(order);
+            validOrderCountList.add(validOrder);
+            totalOrderCount +=order;
+            validOrderCount +=validOrder;
+        }
+
+        //订单完成率
+        Double orderCompletionRate =0.0;
+        if(totalOrderCount != 0) {
+            //计算订单完成率
+            orderCompletionRate = validOrderCount.doubleValue() / totalOrderCount;
+        }
+
+        return OrderReportVO
+                .builder()
+                .dateList(StringUtils.join(dateList, ","))
+                .orderCountList(StringUtils.join(orderCountList, ","))
+                .validOrderCountList(StringUtils.join(validOrderCountList, ","))
+                .totalOrderCount(totalOrderCount)
+                .validOrderCount(validOrderCount)
+                .orderCompletionRate(orderCompletionRate)
+                .build();
+    }
+
+    /**
+     * 根据指定的开始日期 结束日期 返回两个日期之间的日期列表数据
+     * @param begin
+     * @param end
+     * @return
+     */
+    private List<LocalDate> getDateList(LocalDate begin, LocalDate end){
+        //用于存在从begin到end范围内每天日期
+        List<LocalDate> dateList = new ArrayList<>();
+
+        dateList.add(begin);
+        while (!begin.equals(end)){
+            //日期计算 指定日期的后一天对应的日期
+            begin = begin.plusDays(1);
+            dateList.add(begin);
+        }
+        return dateList;
     }
 }
